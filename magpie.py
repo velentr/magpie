@@ -1,0 +1,146 @@
+# SPDX-FileCopyrightText: 2023 Brian Kubisiak <brian@kubisiak.com>
+#
+# SPDX-License-Identifier: GPL-3.0-only
+
+"""Synchronize data channels with remote backups."""
+
+import argparse
+import configparser
+import os
+import pathlib
+import subprocess
+import sys
+import typing as T
+
+
+APPNAME = "magpie"
+
+
+def error(msg: str, *args: T.Any, result: int = 1) -> None:
+    """Print an error message and exit."""
+    msg = msg % args
+    print(f"error: {msg}")
+    sys.exit(result)
+
+
+def get_config_path() -> pathlib.Path:
+    """Get the path to the config file, respecting XDG_CONFIG_HOME."""
+    config_dir = pathlib.Path(
+        os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+    )
+    return config_dir / APPNAME / "config.ini"
+
+
+def run_action_for_channel(
+    action: str, channel: str, config: configparser.ConfigParser
+) -> None:
+    """Run ACTION for CHANNEL, pulling the environment from CONFIG."""
+    engine = config[channel].get("engine")
+    if engine is None:
+        error("%s is missing an engine", channel)
+
+    raw_path = config[channel].get("path")
+    if raw_path is None:
+        error("%s is missing a path", channel)
+    path = pathlib.Path.home() / raw_path
+    path.mkdir(parents=True, exist_ok=True)
+
+    env = os.environ.copy()
+    env.update(dict(config[channel].items()))
+
+    # For XDG_*_HOME
+    env["APPNAME"] = APPNAME
+
+    print(f"{action}ing {channel}...")
+    try:
+        ret = subprocess.call(
+            [f"{APPNAME}-{engine}-{action}"], env=env, cwd=path
+        )
+        if ret != 0:
+            error(
+                "%sing %s (using the %s engine) failed",
+                action,
+                channel,
+                engine,
+                result=ret,
+            )
+    except (FileNotFoundError, PermissionError) as exn:
+        error("%s", exn)
+
+
+def sync(args: argparse.Namespace, config: configparser.ConfigParser) -> None:
+    """Run the sync command."""
+    if args.all:
+        for channel in config.sections():
+            run_action_for_channel("sync", channel, config)
+    else:
+        # The path listed in the config file is relative to the user's home
+        # directory; get $PWD relative to the home directory in order to
+        # perform the lookup.
+        cwd = os.path.relpath(
+            os.path.abspath(os.getcwd()), os.path.expanduser("~")
+        )
+        channel = None
+        for section in config.sections():
+            if config[section].get("path") == cwd:
+                channel = section
+                break
+
+        if channel is None:
+            error("cannot find channel for %s", cwd)
+        assert channel is not None
+        run_action_for_channel("sync", channel, config)
+
+
+def init(config: configparser.ConfigParser) -> None:
+    """Initialize all channels so they are ready to use."""
+    for channel in config.sections():
+        run_action_for_channel("init", channel, config)
+
+
+def main() -> None:
+    """Parse the config and run the requested action."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=pathlib.Path,
+        help="Path to an alternate config file.",
+    )
+    parser.add_argument(
+        "-C",
+        type=pathlib.Path,
+        metavar="directory",
+        dest="change_dir",
+        help="Change to DIRECTORY before running the command.",
+    )
+    subparsers = parser.add_subparsers(
+        title="action",
+        dest="action",
+        description="Action to run on the magpie instance.",
+    )
+    subparsers.add_parser(
+        "init", description="Initialize all configured backup channels."
+    )
+    sync_parser = subparsers.add_parser(
+        "sync", description="Synchronize all channels with remotes."
+    )
+    sync_parser.add_argument(
+        "-a", "--all", action="store_true", help="Sync all channels."
+    )
+    args = parser.parse_args()
+
+    config = configparser.ConfigParser()
+    config.read(args.config or get_config_path())
+
+    if args.change_dir:
+        os.chdir(args.change_dir)
+
+    if args.action == "sync":
+        sync(args, config)
+    elif args.action == "init":
+        init(config)
+
+
+if __name__ == "__main__":
+    main()

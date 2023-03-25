@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# SPDX-FileCopyrightText: 2023 Brian Kubisiak <brian@kubisiak.com>
+#
+# SPDX-License-Identifier: GPL-3.0-only
+
+set -e
+
+if [ -z "${url}" ]; then
+	echo error: url isn\'t configured >&2
+	exit 1
+fi
+
+if [ ! -d ".git" ]; then
+	git clone "${url}" .
+else
+	git remote set-url origin "${url}"
+fi
