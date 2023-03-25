@@ -4,8 +4,6 @@
 #
 # SPDX-License-Identifier: GPL-3.0-only
 
-export PATH="${PATH}:${PWD}/scripts"
-export PYTHONPATH=.
-export PYTHONDONTWRITEBYTECODE=1
+export PATH="${PATH}:${PWD}"
 
 exec "$@"
