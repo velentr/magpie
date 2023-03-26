@@ -4,6 +4,7 @@
 
 (use-modules (gnu packages base)
              (gnu packages python)
+             (gnu packages rsync)
              (gnu packages version-control)
              (guix build utils)
              (guix build-system copy)
@@ -29,10 +30,17 @@
                                   (list
                                    (string-append bin "/magpie-" engine "-init")
                                    (string-append bin "/magpie-" engine "-sync")))
-                                '("git"))))
-                 (PATH (map (lambda (package)
-                              (string-append (assoc-ref inputs package) "/bin"))
-                            '("coreutils" "git"))))
+                                '("git" "rsync"))))
+                 (PATH
+                  (map (lambda (package)
+                         (string-append (assoc-ref inputs package) "/bin"))
+                       '("coreutils"
+                         "diffutils"
+                         "findutils"
+                         "git"
+                         "grep"
+                         "rsync"
+                         "sed"))))
             (for-each
              (lambda (script)
                (wrap-program script
@@ -42,9 +50,11 @@
               `("PATH" ":" prefix (,bin)))))))
     #:install-plan '(("magpie" "bin/magpie")
                       ("magpie-git-init" "bin/magpie-git-init")
-                      ("magpie-git-sync" "bin/magpie-git-sync"))))
+                      ("magpie-git-sync" "bin/magpie-git-sync")
+                      ("magpie-rsync-init" "bin/magpie-rsync-init")
+                      ("magpie-rsync-sync" "bin/magpie-rsync-sync"))))
  (inputs
-  (list coreutils git python))
+  (list coreutils diffutils findutils git grep python rsync sed))
  (synopsis "Simple scriptable backup script")
  (description "Magpie is a simple backup script that treats data as a set of
 channels. Each channel is synchronized with a remote using an engine. Magpie is
