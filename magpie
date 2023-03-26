@@ -50,8 +50,9 @@ def run_action_for_channel(
     env = os.environ.copy()
     env.update(dict(config[channel].items()))
 
-    # For XDG_*_HOME
+    # For using XDG_*_HOME
     env["APPNAME"] = APPNAME
+    env["CHANNEL"] = channel
 
     print(f"{action}ing {channel}...")
     try:
