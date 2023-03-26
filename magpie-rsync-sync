@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# SPDX-FileCopyrightText: 2023 Brian Kubisiak <brian@kubisiak.com>
+#
+# SPDX-License-Identifier: GPL-3.0-only
+
+set -e
+
+if [ -z "${url}" ]; then
+	echo error: url isn\'t configured >&2
+	exit 1
+fi
+
+data_dir=${XDG_DATA_HOME:=$HOME/.local/share}/${APPNAME}/${CHANNEL}
+sync_stamp=${data_dir}/last_sync.txt
+exclude_file=${data_dir}/exclude.txt
+
+stamp() {
+	find . -type f | sed 's/^\.\///' | sort
+}
+
+stamp | diff "${sync_stamp}" - | grep '^<\|>' | cut -c 3- > "${exclude_file}"
+
+rsync --recursive \
+      --perms \
+      --compress \
+      --verbose \
+      --delete \
+      --exclude-from="${exclude_file}" \
+      "${url}" \
+      "${HOME}/${path}"/
+
+rsync --recursive \
+      --perms \
+      --compress \
+      --verbose \
+      --delete \
+      "${HOME}/${path}"/ \
+      "${url}"
+
+rm "${exclude_file}"
+
+stamp > "${sync_stamp}"

@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# SPDX-FileCopyrightText: 2023 Brian Kubisiak <brian@kubisiak.com>
+#
+# SPDX-License-Identifier: GPL-3.0-only
+
+set -e
+
+data_dir=${XDG_DATA_HOME:=$HOME/.local/share}/${APPNAME}/${CHANNEL}
+sync_stamp=${data_dir}/last_sync.txt
+
+mkdir -p "${data_dir}"
+
+# If the sync stamp already exists, we don't want to modify it so existing
+# channels will continue to work noramlly. If it doesn't exist, we want to make
+# it empty since we assume we want to push all local files to the remote.
+touch "${sync_stamp}"
