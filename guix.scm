@@ -2,7 +2,8 @@
 ;;;
 ;;; SPDX-License-Identifier: GPL-3.0-only
 
-(use-modules (gnu packages python)
+(use-modules (gnu packages base)
+             (gnu packages python)
              (gnu packages version-control)
              (guix build utils)
              (guix build-system copy)
@@ -18,16 +19,32 @@
  (arguments
   '(#:phases
     (modify-phases %standard-phases
-      (add-before 'install 'patch-input-paths
-        (lambda* (#:key inputs #:allow-other-keys)
-          (let ((git (assoc-ref inputs "git")))
-            (substitute* '("magpie-git-init" "magpie-git-sync")
-              (("git") (string-append git "/bin/git")))))))
+      (add-after 'install 'patch-input-paths
+        (lambda* (#:key inputs outputs #:allow-other-keys)
+          (let* ((out (assoc-ref outputs "out"))
+                 (bin (string-append out "/bin"))
+                 (engines (apply
+                           append
+                           (map (lambda (engine)
+                                  (list
+                                   (string-append bin "/magpie-" engine "-init")
+                                   (string-append bin "/magpie-" engine "-sync")))
+                                '("git"))))
+                 (PATH (map (lambda (package)
+                              (string-append (assoc-ref inputs package) "/bin"))
+                            '("coreutils" "git"))))
+            (for-each
+             (lambda (script)
+               (wrap-program script
+                 `("PATH" ":" prefix ,PATH)))
+             engines)
+            (wrap-program (string-append bin "/magpie")
+              `("PATH" ":" prefix (,bin)))))))
     #:install-plan '(("magpie" "bin/magpie")
                       ("magpie-git-init" "bin/magpie-git-init")
                       ("magpie-git-sync" "bin/magpie-git-sync"))))
  (inputs
-  (list git python))
+  (list coreutils git python))
  (synopsis "Simple scriptable backup script")
  (description "Magpie is a simple backup script that treats data as a set of
 channels. Each channel is synchronized with a remote using an engine. Magpie is
